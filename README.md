@@ -33,4 +33,4 @@ HUMAN/       审核后晋升的最高净值内容，只能由人类最终确认�
 
 ## 示例
 
-一个研究内容已脱敏的科研项目 inter 总览页：[docs/demo-inter.html](docs/demo-inter.html)。可以作为效果的切面展示。
+一个研究内容已脱敏的科研项目 inter 总览页：[在线查看交互页面](https://yancy8333.github.io/labkit/demo-inter.html)（[HTML 源码](docs/demo-inter.html)）。可以作为效果的切面展示。
