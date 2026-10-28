@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inter — {{NAME}}</title>
+<style>
+  :root{
+    --page:#CCCCCC; --sheet:#FFFFFF; --ink:#1a1a1a; --dim:#666666;
+    --grid:rgb(128,128,128); --link:#0066CC; --line:#c8c8c8; --soft:#F5F5F5;
+    --ok:#1a7f37; --warn:#8a6d00; --bad:#c0392b; --acc:#0066CC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:14px/1.7 Verdana,"Segoe UI",Arial,"Microsoft YaHei",sans-serif}
+  .sheet{background:var(--sheet);width:min(1700px,95vw);margin:22px auto;
+         padding:34px 46px 26px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+  h1{font-family:"Times New Roman",Times,serif;font-size:30px;font-weight:bold;margin:0 0 2px}
+  .goal{font-family:"Times New Roman",Times,serif;font-size:16px;color:var(--dim);margin:0 0 6px}
+  hr.rule{border:none;border-top:1px solid var(--grid);margin:14px 0}
+  .sect{font-family:"Times New Roman",Times,serif;font-size:20px;font-weight:bold;margin:18px 0 6px}
+  .topbar{display:flex;gap:14px;align-items:center;margin:10px 0 4px;flex-wrap:wrap}
+  select{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:4px;
+         padding:6px 10px;font:13.5px inherit;min-width:300px;cursor:pointer}
+  select:focus{outline:1px solid var(--acc)}
+  .bar{display:flex;gap:16px;align-items:center;color:var(--dim);font-size:12.5px;flex:1}
+  .live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);
+            animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  button{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:4px;
+         padding:4px 12px;font-size:12.5px;cursor:pointer}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:1px 12px;font-size:13.5px}
+  .kv b{color:var(--dim);font-weight:bold}
+  .badge{display:inline-block;padding:0 9px;border-radius:3px;font-size:11.5px;font-weight:bold;
+         vertical-align:2px;border:1px solid}
+  .s-active{color:var(--ok);border-color:var(--ok);background:#f0f9f0}
+  .s-confirmed,.s-closed,.s-planned{color:var(--dim);border-color:var(--line);background:#f5f5f5}
+  .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:6px 4px;
+       border-bottom:1px dotted var(--line);cursor:pointer}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:var(--soft)}
+  .row .id{font-family:Consolas,monospace;color:var(--acc);font-weight:bold}
+  .row .name{font-weight:bold}
+  .row .c{color:var(--dim);font-size:13px;flex:1;min-width:240px;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:4px 0}
+  th,td{border:1px solid var(--line);padding:3px 8px;text-align:center;vertical-align:middle}
+  th{background:var(--soft);color:#333;font-weight:bold}
+  .panel{border:1px solid var(--line);border-radius:4px;padding:8px 12px;margin:8px 0;background:#fff}
+  .panel .pt{font-size:13px;font-weight:bold;margin-bottom:1px}
+  .panel .ps{font-size:11px;color:var(--dim);font-family:Consolas,monospace;margin-bottom:3px}
+  .patch{border:1px dashed #bbb;border-radius:4px;padding:12px;color:#888;font-size:12.5px;margin:8px 0;
+         background:repeating-linear-gradient(45deg,transparent,transparent 8px,#00000005 8px,#00000005 16px)}
+  textarea{width:100%;min-height:60px;background:#fff;color:var(--ink);border:1px solid var(--line);
+           border-radius:4px;padding:7px 9px;font:13px/1.5 inherit;resize:vertical;margin-top:6px}
+  textarea:focus{outline:1px solid var(--acc)}
+  .notehead{font-size:12px;color:var(--dim);margin-top:10px;display:flex;
+            justify-content:space-between;align-items:center}
+  .saved{color:var(--ok);opacity:0;transition:opacity .4s}
+  .saved.show{opacity:1}
+  .log{font-family:Consolas,monospace;font-size:12px;color:#444;white-space:pre-wrap}
+  .hint{font-size:12px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:8px}
+  .empty{color:var(--dim);font-style:italic}
+  .runcard{border:1px solid var(--grid);border-radius:4px;padding:8px 14px;margin:6px 0;background:#fff}
+  .runcard .rname{font-family:Consolas,monospace;font-weight:bold;font-size:13px}
+  .runcard .rline{font-size:12.5px;color:#444}
+  .prog{background:#e8e8e8;border-radius:3px;height:10px;overflow:hidden;margin:4px 0}
+  .prog>div{background:var(--ok);height:100%}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1 id="title"></h1>
+  <p class="goal" id="goal"></p>
+
+  <div class="topbar">
+    <select id="nav"></select>
+    <div class="bar">
+      <span id="livemark"></span>
+      <span id="updated"></span>
+      <button onclick="location.hash='fulllog'">全部流水</button>
+    </div>
+  </div>
+
+  <div id="view"></div>
+</div>
+
+<script>
+/* ================= AGENT: 收工时刷新这个块（唯一的维护点） =================
+   directions[] / branches[] 字段: id, name, status(active|confirmed|closed|planned),
+   goal, hypothesis, criteria, conclusion, evidence, panels[]
+   panels[] 契约（三种，title 必填，其余按 type）:
+     { title, source, type:"table",  columns:[...], rows:[[...],...] }   数字从结果文件原样拷贝
+     { title, source, type:"html",   html:"<svg .../>或<table ...>" }     内联 SVG/表格，禁外部库、禁 fetch
+     { title,          type:"placeholder", hint:"这块留給什么" }          空位，人点单后才填
+   live 区由 watcher 维护（见 AGENTS.md「While a run is active」）:
+     live: { updated:"...", runs:[ { name, dir, status(running|completed|failed), done, total,
+                                     failed, current, elapsed, eta, note } ] }
+   时间戳一律真实机器时钟、含秒、带 UTC 偏移（如 2026-10-28 14:26:37 +08:00），不凑整不编造。
+   流水 TYPE（只记动作，六种）: N 新建 · R 运行 · F 修正(只追加修正记录，不覆写原记录) · M 节点(人确认+快照) · P 晋升(进 HUMAN) · X 失败。
+   没有"变更"类：记录 append-only，结论被推翻=原处划掉旧值追加新值，不存在回头改写。
+   讨论/推理/提问不进流水——想法只有落成动作才被记录。
+   规则: 每个 table/html panel 必须带 source(相对路径); 不编造数字; 表保持小(聚合/Top-N);
+         收工只刷新结构字段(status/conclusion/log/now), 统计 panel 按人要求或 milestone 摘要才填;
+         log 数组是窗口内的最近流水(≤40, 滚动归档时清空), logFull 可选存放跨窗口累计的完整流水(同样式)。 */
+const DATA = {
+  updated: "{{DATETIME}}",
+  project: { name: "{{NAME}}", goal: "{{GOAL}}" },
+  now: { goal: "{{GOAL}}", doing: "", next: "", blocked: "" },
+  live: { updated: "", runs: [] },  directions: [
+    /* { id:"e001", name:"...", status:"closed", goal:"...", conclusion:"...", evidence:"...",
+         panels:[ {title:"...", type:"placeholder", hint:"..."} ],
+         branches:[ { id:"b01", name:"...", status:"closed", goal:"...", conclusion:"...", evidence:"...",
+                      panels:[ {title:"...", source:"...", type:"table", columns:["..."], rows:[["..."]]} ] } ] } */
+  ],
+  log: []
+};
+/* ===================== 以下不需要改动 ===================== */
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const badge = st => `<span class="badge s-${esc(st||'planned')}">${esc(st||'?')}</span>`;
+const noteKey = k => `inter-note:${DATA.project.name}:${k}`;
+const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
+
+function buildNav() {
+  const sel = $('#nav');
+  let h = `<option value="overview">总览</option>`;
+  for (const d of DATA.directions) {
+    h += `<optgroup label="${esc(d.id)} ${esc(d.name)}">`;
+    h += `<option value="${esc(d.id)}">${esc(d.id)} · ${esc(d.name)}</option>`;
+    for (const b of d.branches || [])
+      h += `<option value="${esc(d.id + ':' + b.id)}">&nbsp;&nbsp;${esc(b.id)} · ${esc(b.name)}</option>`;
+    h += `</optgroup>`;
+  }
+  sel.innerHTML = h;
+  sel.onchange = () => { location.hash = sel.value; };
+}
+
+function findPage(key) {
+  if (key === 'overview') return null;
+  const [dId, bId] = key.split(':');
+  const d = DATA.directions.find(x => x.id === dId);
+  if (!bId) return { page: d, dir: d, key };
+  return { page: (d.branches||[]).find(x => x.id === bId), dir: d, key };
+}
+
+function panelHtml(p) {
+  if (p.type === 'table')
+    return `<div class="panel"><div class="pt">${esc(p.title)}</div>${p.source?`<div class="ps">source: ${esc(p.source)}</div>`:''}
+      <table><thead><tr>${p.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${p.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      ${p.note?`<div class="ps">${esc(p.note)}</div>`:''}</div>`;
+  if (p.type === 'html')
+    return `<div class="panel"><div class="pt">${esc(p.title)}</div>${p.source?`<div class="ps">source: ${esc(p.source)}</div>`:''}${p.html}</div>`;
+  return `<div class="patch">▣ ${esc(p.title)}${p.hint?` — ${esc(p.hint)}`:''}</div>`;
+}
+
+function noteBox(key) {
+  return `<div class="notehead"><span>我的笔记（本机保存）</span><span class="saved" data-saved>已保存</span></div>
+    <textarea data-note data-k="${esc(key)}" placeholder="写给未来的自己或 agent 的结论/疑问…" oninput="saveNote(this)"></textarea>`;
+}
+
+function liveHtml() {
+  const L = DATA.live || {runs:[]};
+  if (!L.runs.length) return '';
+  const cards = L.runs.map(r => {
+    const pct = r.total ? Math.round(100*r.done/r.total) : 0;
+    return `<div class="runcard">
+      <span class="rname">${esc(r.name)}</span>
+      <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
+      <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · 当前 ${esc(r.current)}`:''}${r.elapsed?` · 已跑 ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
+      <div class="prog"><div style="width:${pct}%"></div></div>
+      ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}
+      ${r.dir?`<div class="ps">${esc(r.dir)}</div>`:''}
+    </div>`;
+  }).join('');
+  return `<hr class="rule"><div class="sect">跑动中</div>${cards}
+    <div class="ps" style="color:var(--dim);font-size:11px">watcher 更新于 ${esc(L.updated||'?')}</div>`;
+}
+
+function renderOverview() {
+  let h = liveHtml();
+  h += `<hr class="rule"><div class="sect">现在</div><div class="kv">${
+    ['goal|目标','doing|正在做','next|下一步','blocked|阻塞']
+      .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
+  h += `<hr class="rule"><div class="sect">方向与实验</div>`;
+  for (const d of DATA.directions) {
+    h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
+      <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
+      <span class="c">${esc(d.conclusion)}</span></div>`;
+    for (const b of d.branches || [])
+      h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
+        <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
+        <span class="c">${esc(b.conclusion)}</span></div>`;
+  }
+  if (!DATA.directions.length) h += `<p class="empty">还没有方向。</p>`;
+  h += `<hr class="rule"><div class="sect">最近流水</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'（无流水）')}</div>`;
+  $('#view').innerHTML = h;
+}
+
+function renderFullLog() {
+  const rows = (DATA.logFull||DATA.log||[]);
+  $('#view').innerHTML = `<div class="row" style="cursor:default;border:none;padding:0">
+      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">全部流水</span>
+      <span style="color:var(--dim);font-size:12px">${rows.length} 条</span></div>
+    <hr class="rule"><div class="log">${esc(rows.join('\n')||'（无流水）')}</div>`;
+  $('#nav').value = '';
+}
+
+function renderDetail({page, dir, key}) {
+  if (!page) { location.hash = 'overview'; return; }
+  const isDir = page === dir;
+  let h = `<div class="row" style="cursor:default;border:none;padding:0">
+      <span class="id" style="font-size:16px">${esc(page.id)}</span>
+      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">${esc(page.name)}</span>${badge(page.status)}
+      ${isDir?'':'<span style="color:var(--dim);font-size:12px">∈ '+esc(dir.id)+' '+esc(dir.name)+'</span>'}</div>
+    <div class="kv" style="margin-top:8px">${fieldRow('goal',page.goal)}${fieldRow('hypothesis',page.hypothesis)}
+      ${fieldRow('criteria',page.criteria)}${fieldRow('conclusion',page.conclusion)}${fieldRow('evidence',page.evidence)}</div>`;
+  h += `<hr class="rule"><div class="sect">统计</div>${(page.panels||[]).map(panelHtml).join('')||'<p class="empty">还没有统计 panel。</p>'}`;
+  h += `<hr class="rule"><div class="sect">笔记</div>${noteBox(key)}`;
+  $('#view').innerHTML = h;
+}
+
+function render() {
+  document.title = 'inter — ' + DATA.project.name;
+  $('#title').textContent = DATA.project.name;
+  $('#goal').textContent = DATA.project.goal;
+  $('#updated').textContent = '数据快照: ' + DATA.updated;
+  const running = (DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running');
+  $('#livemark').innerHTML = running ? '<span class="live-dot"></span> live' : '';
+  const key = location.hash.slice(1) || 'overview';
+  $('#nav').value = key;
+  if (key === 'overview') renderOverview();
+  else if (key === 'fulllog') renderFullLog();
+  else renderDetail(findPage(key));
+  document.querySelectorAll('[data-note]').forEach(t => { t.value = localStorage.getItem(noteKey(t.dataset.k)) || ''; });
+}
+
+function saveNote(t) {
+  localStorage.setItem(noteKey(t.dataset.k), t.value);
+  const s = t.closest('.sheet').querySelector('[data-saved]');
+  s.classList.add('show'); clearTimeout(s._t); s._t = setTimeout(()=>s.classList.remove('show'), 1200);
+}
+
+buildNav();
+window.addEventListener('hashchange', render);
+render();
+/* 有 run 在跑时每 30s 自动重载（watcher 已把最新进度写进文件） */
+if ((DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running')) {
+  setInterval(() => { if (document.visibilityState === 'visible') location.reload(); }, 30000);
+}
+</script>
+</body>
+</html>

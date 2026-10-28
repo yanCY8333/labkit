@@ -1,0 +1,11 @@
+# Big products never enter git — commit only the scripts and configs that generate them.
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+__pycache__/
+.ipynb_checkpoints/
+
+# The shared pools stay on disk only; integrity is tracked by path+hash references.
+AIWORK/Experiment/data/*
+!AIWORK/Experiment/data/.gitkeep
