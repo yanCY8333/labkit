@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inter — {{NAME}}</title>
+<style>
+  :root{
+    --page:#CCCCCC; --sheet:#FFFFFF; --ink:#1a1a1a; --dim:#666666;
+    --grid:rgb(128,128,128); --link:#0066CC; --line:#c8c8c8; --soft:#F5F5F5;
+    --ok:#1a7f37; --warn:#8a6d00; --bad:#c0392b; --acc:#0066CC;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page);color:var(--ink);
+       font:14px/1.7 Verdana,"Segoe UI",Arial,"Microsoft YaHei",sans-serif}
+  .sheet{background:var(--sheet);width:min(1700px,95vw);margin:22px auto;
+         padding:34px 46px 26px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+  h1{font-family:"Times New Roman",Times,serif;font-size:30px;font-weight:bold;margin:0 0 2px}
+  .goal{font-family:"Times New Roman",Times,serif;font-size:16px;color:var(--dim);margin:0 0 6px}
+  hr.rule{border:none;border-top:1px solid var(--grid);margin:14px 0}
+  .sect{font-family:"Times New Roman",Times,serif;font-size:20px;font-weight:bold;margin:18px 0 6px}
+  .topbar{display:flex;gap:14px;align-items:center;margin:10px 0 4px;flex-wrap:wrap}
+  select{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:4px;
+         padding:6px 10px;font:13.5px inherit;min-width:300px;cursor:pointer}
+  select:focus{outline:1px solid var(--acc)}
+  .bar{display:flex;gap:16px;align-items:center;color:var(--dim);font-size:12.5px;flex:1}
+  .live-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--ok);
+            animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  button{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:4px;
+         padding:4px 12px;font-size:12.5px;cursor:pointer}
+  button:hover{border-color:var(--acc);color:var(--acc)}
+  .kv{display:grid;grid-template-columns:110px 1fr;gap:1px 12px;font-size:13.5px}
+  .kv b{color:var(--dim);font-weight:bold}
+  .badge{display:inline-block;padding:0 9px;border-radius:3px;font-size:11.5px;font-weight:bold;
+         vertical-align:2px;border:1px solid}
+  .s-active{color:var(--ok);border-color:var(--ok);background:#f0f9f0}
+  .s-confirmed,.s-closed,.s-planned{color:var(--dim);border-color:var(--line);background:#f5f5f5}
+  .row{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:6px 4px;
+       border-bottom:1px dotted var(--line);cursor:pointer}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:var(--soft)}
+  .row .id{font-family:Consolas,monospace;color:var(--acc);font-weight:bold}
+  .row .name{font-weight:bold}
+  .row .c{color:var(--dim);font-size:13px;flex:1;min-width:240px;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:4px 0}
+  th,td{border:1px solid var(--line);padding:3px 8px;text-align:center;vertical-align:middle}
+  th{background:var(--soft);color:#333;font-weight:bold}
+  .panel{border:1px solid var(--line);border-radius:4px;padding:8px 12px;margin:8px 0;background:#fff}
+  .panel .pt{font-size:13px;font-weight:bold;margin-bottom:1px}
+  .panel .ps{font-size:11px;color:var(--dim);font-family:Consolas,monospace;margin-bottom:3px}
+  .patch{border:1px dashed #bbb;border-radius:4px;padding:12px;color:#888;font-size:12.5px;margin:8px 0;
+         background:repeating-linear-gradient(45deg,transparent,transparent 8px,#00000005 8px,#00000005 16px)}
+  textarea{width:100%;min-height:60px;background:#fff;color:var(--ink);border:1px solid var(--line);
+           border-radius:4px;padding:7px 9px;font:13px/1.5 inherit;resize:vertical;margin-top:6px}
+  textarea:focus{outline:1px solid var(--acc)}
+  .notehead{font-size:12px;color:var(--dim);margin-top:10px;display:flex;
+            justify-content:space-between;align-items:center}
+  .saved{color:var(--ok);opacity:0;transition:opacity .4s}
+  .saved.show{opacity:1}
+  .log{font-family:Consolas,monospace;font-size:12px;color:#444;white-space:pre-wrap}
+  .hint{font-size:12px;color:var(--dim);border-top:1px solid var(--line);padding-top:10px;margin-top:8px}
+  .empty{color:var(--dim);font-style:italic}
+  .runcard{border:1px solid var(--grid);border-radius:4px;padding:8px 14px;margin:6px 0;background:#fff}
+  .runcard .rname{font-family:Consolas,monospace;font-weight:bold;font-size:13px}
+  .runcard .rline{font-size:12.5px;color:#444}
+  .prog{background:#e8e8e8;border-radius:3px;height:10px;overflow:hidden;margin:4px 0}
+  .prog>div{background:var(--ok);height:100%}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <h1 id="title"></h1>
+  <p class="goal" id="goal"></p>
+
+  <div class="topbar">
+    <select id="nav"></select>
+    <div class="bar">
+      <span id="livemark"></span>
+      <span id="updated"></span>
+      <button onclick="location.hash='fulllog'">全部流水</button>
+    </div>
+  </div>
+
+  <div id="view"></div>
+</div>
+
+<script>
+/* ================= AGENT: 收工时刷新这个块（唯一的维护点） =================
+   directions[] / branches[] 字段: id, name, status(active|confirmed|closed|planned),
+   goal, hypothesis, criteria, conclusion, evidence, panels[]
+   panels[] 契约（三种，title 必填，其余按 type）:
+     { title, source, type:"table",  columns:[...], rows:[[...],...] }   数字从结果文件原样拷贝
+     { title, source, type:"html",   html:"<svg .../>或<table ...>" }     内联 SVG/表格，禁外部库、禁 fetch
+     { title,          type:"placeholder", hint:"这块留給什么" }          空位，人点单后才填
+   live 区由 watcher 维护（见 AGENTS.md「While a run is active」）:
+     live: { updated:"...", runs:[ { name, dir, status(running|completed|failed), done, total,
+                                     failed, current, elapsed, eta, note } ] }
+   时间戳一律真实机器时钟、含秒、带 UTC 偏移（如 2026-10-28 14:26:37 +08:00），不凑整不编造。
+   规则: 每个 table/html panel 必须带 source(相对路径); 不编造数字; 表保持小(聚合/Top-N);
+         收工只刷新结构字段(status/conclusion/log/now), 统计 panel 按人要求或 milestone 摘要才填;
+         log 数组是窗口内的最近流水(≤40, 滚动归档时清空), logFull 可选存放跨窗口累计的完整流水(同样式)。 */
+const DATA = {
+  updated: "2026-10-28 15:30:00 +08:00",
+  project: { name: "example-project", goal: "Demonstration of the inter page on a real project (methods and task details anonymized)." },
+  now: { goal: "Evaluate a signal-fitting technique's real benefit boundary", doing: "idle — awaiting milestone review", next: "Write the analysis for the latest ablation queue", blocked: "none" },
+  live: { updated: "", runs: [] },
+  directions: [
+    { id: "e000", name: "baseline", status: "confirmed",
+      goal: "Reference model on the evaluation set — the anchor every direction measures against",
+      criteria: "Frozen protocol: fixed test set, fixed budget, fixed seed",
+      conclusion: "Baseline established. Means across the 6 configurations: 18.65–23.69 (unit redacted).",
+      evidence: "e000-baseline/README.md",
+      panels: [
+        { title: "Per-bench: item × configuration (reference model)", type: "table",
+          source: "e000-baseline/per_bench.csv",
+          columns: ["item", "cfg-1", "cfg-2", "cfg-3", "cfg-4", "cfg-5", "cfg-6"],
+          rows: [
+            ["01", "15.65", "18.73", "16.22", "19.85", "16.37", "20.19"],
+            ["02", "18.29", "21.65", "19.04", "23.22", "19.58", "23.39"],
+            ["03", "18.09", "20.70", "18.45", "21.77", "18.64", "22.40"],
+            ["04", "19.45", "23.55", "20.53", "25.40", "20.31", "25.69"],
+            ["05", "17.60", "20.21", "17.65", "21.38", "17.87", "21.88"],
+            ["06", "16.09", "19.18", "16.65", "20.42", "16.68", "20.63"],
+            ["07", "20.11", "22.37", "20.51", "23.48", "20.64", "23.71"],
+            ["08", "19.65", "23.15", "20.13", "24.41", "20.12", "24.61"]
+          ] }
+      ],
+      branches: [
+        { id: "b01", name: "full-observation", status: "confirmed",
+          goal: "Reference model, full measurement — the live anchor",
+          conclusion: "Width ≫ depth at this budget; every gain claim quotes this table.",
+          evidence: "b01/README.md", panels: [] },
+        { id: "b02", name: "sparse-observation", status: "confirmed",
+          goal: "Sparse measurement arm — judged not meaningful after discussion, not pursued further; numbers kept as record",
+          conclusion: "Recorded. Small drop vs full reflects the unconverged regime.",
+          evidence: "b02/README.md",
+          panels: [
+            { title: "Sparse means (record; not pursued)", type: "table",
+              source: "b02/per_bench.csv",
+              columns: ["config", "mean", "min", "max"],
+              rows: [
+                ["cfg-1", "18.56", "13.70", "26.19"],
+                ["cfg-2", "21.73", "17.31", "30.13"],
+                ["cfg-4", "22.73", "18.60", "32.36"]
+              ],
+              note: "judged not meaningful after discussion — not pursued" }
+          ] }
+      ] },
+    { id: "e001", name: "variant-A", status: "closed",
+      goal: "A constrained treatment, tested on two input types",
+      criteria: "Consistent positive gain over same-backbone reference at converged budgets",
+      conclusion: "Dead end. Median gain tiny; converged large model -1.88 (capacity substitution). Task stays open; this treatment closed.",
+      evidence: "REVIEW/m1-closure",
+      panels: [
+        { title: "Final gains by experiment line", type: "table",
+          source: "REVIEW/m1-closure/files (queue results, aggregated)",
+          columns: ["line", "setup", "mean", "median", "verdict"],
+          rows: [
+            ["closed-form", "12 items, small model, best-ckpt", "+0.319", "+0.544", "rejected (needs GT)"],
+            ["learnable knots", "8 items, sparse obs, unseen", "+0.697", "+0.118", "mixed"],
+            ["full-fit small", "1 item, converged", "+1.63", "-", "speed not capability"],
+            ["full-fit large", "1 item, converged", "-1.88", "-", "capacity substitution"]
+          ] }
+      ],
+      branches: [
+        { id: "b01", name: "input-type-1", status: "closed",
+          goal: "Treatment vs reference on 12 real items",
+          conclusion: "12/12 positive but tiny; converged full-fit shows speed-not-capability. Closed.",
+          evidence: "REVIEW/m1-closure",
+          panels: [ { title: "Per-item paired gains", type: "placeholder", hint: "12 rows, paired deltas" } ] },
+        { id: "b02", name: "input-type-2", status: "closed",
+          goal: "Port to the second input type",
+          conclusion: "Failed; thin written record. Successor direction keeps the field, drops the constraint.",
+          evidence: "REVIEW/m2-failure", panels: [] }
+      ] },
+    { id: "e002", name: "variant-B", status: "confirmed",
+      goal: "A grid-parameterized treatment — density and amplitude scans",
+      criteria: "Same-backbone controls, converged or labeled budgets",
+      conclusion: "Mid densities optimal at long budget (+1.77); amplitude 0.5 > 0.25 (+2.71). Short-budget numbers overstate gain.",
+      evidence: "REVIEW/m3-grid, b01-evidence/ local",
+      panels: [
+        { title: "Density scan, converged budget", type: "table",
+          source: "b01-evidence/queue-1/results.csv",
+          columns: ["grid", "params", "reference", "treated", "gain"],
+          rows: [
+            ["5", "200", "27.06", "27.26", "+0.20"],
+            ["17", "2312", "27.06", "27.99", "+0.93"],
+            ["65", "33800", "27.06", "28.81", "+1.75"],
+            ["129", "133128", "27.06", "28.82", "+1.77"],
+            ["513", "2105352", "27.06", "27.98", "+0.92"]
+          ] },
+        { title: "Gain vs density curve", type: "placeholder", hint: "inline SVG line chart (peak at mid densities)" }
+      ],
+      branches: [
+        { id: "b01", name: "density", status: "confirmed",
+          goal: "Density scan across the range",
+          conclusion: "Peak at mid density; best setting moves with model size at short budget.",
+          evidence: "b01-evidence/queues", panels: [] },
+        { id: "b02", name: "amplitude", status: "confirmed",
+          goal: "Deformation space and learning-rate scans",
+          conclusion: "Largest space best; mid lr window optimal; deeper > shallower at same grid.",
+          evidence: "b01-evidence/queues", panels: [] }
+      ] },
+    { id: "e003", name: "variant-C", status: "confirmed",
+      goal: "A multi-resolution treatment — mechanism vs parameter allocation",
+      criteria: "Same-layer/same-budget fine-only controls; frozen protocol",
+      conclusion: "Best result +5.0 over reference, but fine-only matches/beats it at matched layers — mechanism unproven. Sparse arm judged not meaningful (not pursued, numbers kept).",
+      evidence: "REVIEW/m4-{scales,pairs,task}, b01/b02/b03 local",
+      panels: [
+        { title: "Evaluation set means by configuration", type: "table",
+          source: "b03/queues (aggregated)",
+          columns: ["config", "ref", "treated-24", "treated-12", "sparse ref", "sparse 24", "sparse 12"],
+          rows: [
+            ["cfg-1", "18.65", "23.09", "21.31", "18.56", "21.47", "20.78"],
+            ["cfg-2", "21.84", "26.34", "24.43", "21.73", "23.02", "23.25"],
+            ["cfg-3", "19.22", "24.00", "22.01", "18.99", "20.58", "20.44"],
+            ["cfg-4", "23.35", "27.97", "25.93", "22.73", "22.76", "23.26"],
+            ["cfg-5", "19.29", "24.17", "22.11", "18.94", "20.27", "20.19"],
+            ["cfg-6", "23.69", "28.26", "26.17", "22.72", "22.57", "23.08"]
+          ],
+          note: "sparse columns: judged not meaningful, not pursued — record only" }
+      ],
+      branches: [
+        { id: "b01", name: "scales", status: "confirmed",
+          goal: "Saturation scan + fine-only / hold-scale mechanism controls",
+          conclusion: "Each finer stage helps; fine-only beats the 1-pair version by up to 0.73. Best config lacks fine-only control.",
+          evidence: "b01/queue", panels: [] },
+        { id: "b02", name: "pairs", status: "confirmed",
+          goal: "Multi-seed × multi-backbone × multi-method",
+          conclusion: "Schedule and direction barely matter; treatment ≈ tuned single-resolution. Pair #2 unseparated.",
+          evidence: "b02/queue", panels: [] },
+        { id: "b03", name: "fit-vs-generalize", status: "confirmed",
+          goal: "Large evaluation run: 384+192+96 jobs",
+          conclusion: "Full: treated +4.4–4.9 over reference everywhere. Sparse: wide configs collapse; ablation inverts ranking. Sparse task judged not meaningful after discussion — not pursued.",
+          evidence: "b03/queues",
+          panels: [
+            { title: "Ablation sparse (wide config): capacity inversion", type: "table",
+              source: "b03/ablation/results.csv",
+              columns: ["structure", "layers", "params", "sparse (wide)"],
+              rows: [
+                ["reference", "0", "0", "23.81"],
+                ["deep-narrow", "12", "176748", "23.78"],
+                ["shallow-narrow", "6", "35622", "24.07"],
+                ["deep-wide", "24", "353496", "23.41"]
+              ],
+              note: "record only — sparse not pursued" }
+          ] }
+      ] }
+  ],
+  log: [
+    "2026-10-27 19:41:28 +08:00 | agent/a | N | Project generated from labkit seed; milestones migrated  out=AIWORK, REVIEW",
+    "2026-10-27 19:48:26 +08:00 | agent/a | R | Queue evidence extracted local (no weights)  out=e002, e003",
+    "2026-10-27 21:21:37 +08:00 | agent/a | N | e000 baseline established (extracted from frozen queue)  out=e000",
+    "2026-10-28 14:21:00 +08:00 | agent/a | F | Sparse arm judged not meaningful with advisor; kept in display with note  out=e000, e003"
+  ]
+};
+/* ===================== 以下不需要改动 ===================== */
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const badge = st => `<span class="badge s-${esc(st||'planned')}">${esc(st||'?')}</span>`;
+const noteKey = k => `inter-note:${DATA.project.name}:${k}`;
+const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
+
+function buildNav() {
+  const sel = $('#nav');
+  let h = `<option value="overview">总览</option>`;
+  for (const d of DATA.directions) {
+    h += `<optgroup label="${esc(d.id)} ${esc(d.name)}">`;
+    h += `<option value="${esc(d.id)}">${esc(d.id)} · ${esc(d.name)}</option>`;
+    for (const b of d.branches || [])
+      h += `<option value="${esc(d.id + ':' + b.id)}">&nbsp;&nbsp;${esc(b.id)} · ${esc(b.name)}</option>`;
+    h += `</optgroup>`;
+  }
+  sel.innerHTML = h;
+  sel.onchange = () => { location.hash = sel.value; };
+}
+
+function findPage(key) {
+  if (key === 'overview') return null;
+  const [dId, bId] = key.split(':');
+  const d = DATA.directions.find(x => x.id === dId);
+  if (!bId) return { page: d, dir: d, key };
+  return { page: (d.branches||[]).find(x => x.id === bId), dir: d, key };
+}
+
+function panelHtml(p) {
+  if (p.type === 'table')
+    return `<div class="panel"><div class="pt">${esc(p.title)}</div>${p.source?`<div class="ps">source: ${esc(p.source)}</div>`:''}
+      <table><thead><tr>${p.columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+      <tbody>${p.rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      ${p.note?`<div class="ps">${esc(p.note)}</div>`:''}</div>`;
+  if (p.type === 'html')
+    return `<div class="panel"><div class="pt">${esc(p.title)}</div>${p.source?`<div class="ps">source: ${esc(p.source)}</div>`:''}${p.html}</div>`;
+  return `<div class="patch">▣ ${esc(p.title)}${p.hint?` — ${esc(p.hint)}`:''}</div>`;
+}
+
+function noteBox(key) {
+  return `<div class="notehead"><span>我的笔记（本机保存）</span><span class="saved" data-saved>已保存</span></div>
+    <textarea data-note data-k="${esc(key)}" placeholder="写给未来的自己或 agent 的结论/疑问…" oninput="saveNote(this)"></textarea>`;
+}
+
+function liveHtml() {
+  const L = DATA.live || {runs:[]};
+  if (!L.runs.length) return '';
+  const cards = L.runs.map(r => {
+    const pct = r.total ? Math.round(100*r.done/r.total) : 0;
+    return `<div class="runcard">
+      <span class="rname">${esc(r.name)}</span>
+      <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
+      <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · 当前 ${esc(r.current)}`:''}${r.elapsed?` · 已跑 ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
+      <div class="prog"><div style="width:${pct}%"></div></div>
+      ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}
+      ${r.dir?`<div class="ps">${esc(r.dir)}</div>`:''}
+    </div>`;
+  }).join('');
+  return `<hr class="rule"><div class="sect">跑动中</div>${cards}
+    <div class="ps" style="color:var(--dim);font-size:11px">watcher 更新于 ${esc(L.updated||'?')}</div>`;
+}
+
+function renderOverview() {
+  let h = liveHtml();
+  h += `<hr class="rule"><div class="sect">现在</div><div class="kv">${
+    ['goal|目标','doing|正在做','next|下一步','blocked|阻塞']
+      .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
+  h += `<hr class="rule"><div class="sect">方向与实验</div>`;
+  for (const d of DATA.directions) {
+    h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
+      <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
+      <span class="c">${esc(d.conclusion)}</span></div>`;
+    for (const b of d.branches || [])
+      h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
+        <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
+        <span class="c">${esc(b.conclusion)}</span></div>`;
+  }
+  if (!DATA.directions.length) h += `<p class="empty">还没有方向。</p>`;
+  h += `<hr class="rule"><div class="sect">最近流水</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'（无流水）')}</div>`;
+  $('#view').innerHTML = h;
+}
+
+function renderFullLog() {
+  const rows = (DATA.logFull||DATA.log||[]);
+  $('#view').innerHTML = `<div class="row" style="cursor:default;border:none;padding:0">
+      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">全部流水</span>
+      <span style="color:var(--dim);font-size:12px">${rows.length} 条</span></div>
+    <hr class="rule"><div class="log">${esc(rows.join('\n')||'（无流水）')}</div>`;
+  $('#nav').value = '';
+}
+
+function renderDetail({page, dir, key}) {
+  if (!page) { location.hash = 'overview'; return; }
+  const isDir = page === dir;
+  let h = `<div class="row" style="cursor:default;border:none;padding:0">
+      <span class="id" style="font-size:16px">${esc(page.id)}</span>
+      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">${esc(page.name)}</span>${badge(page.status)}
+      ${isDir?'':'<span style="color:var(--dim);font-size:12px">∈ '+esc(dir.id)+' '+esc(dir.name)+'</span>'}</div>
+    <div class="kv" style="margin-top:8px">${fieldRow('goal',page.goal)}${fieldRow('hypothesis',page.hypothesis)}
+      ${fieldRow('criteria',page.criteria)}${fieldRow('conclusion',page.conclusion)}${fieldRow('evidence',page.evidence)}</div>`;
+  h += `<hr class="rule"><div class="sect">统计</div>${(page.panels||[]).map(panelHtml).join('')||'<p class="empty">还没有统计 panel。</p>'}`;
+  h += `<hr class="rule"><div class="sect">笔记</div>${noteBox(key)}`;
+  $('#view').innerHTML = h;
+}
+
+function render() {
+  document.title = 'inter — ' + DATA.project.name;
+  $('#title').textContent = DATA.project.name;
+  $('#goal').textContent = DATA.project.goal;
+  $('#updated').textContent = '数据快照: ' + DATA.updated;
+  const running = (DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running');
+  $('#livemark').innerHTML = running ? '<span class="live-dot"></span> live' : '';
+  const key = location.hash.slice(1) || 'overview';
+  $('#nav').value = key;
+  if (key === 'overview') renderOverview();
+  else if (key === 'fulllog') renderFullLog();
+  else renderDetail(findPage(key));
+  document.querySelectorAll('[data-note]').forEach(t => { t.value = localStorage.getItem(noteKey(t.dataset.k)) || ''; });
+}
+
+function saveNote(t) {
+  localStorage.setItem(noteKey(t.dataset.k), t.value);
+  const s = t.closest('.sheet').querySelector('[data-saved]');
+  s.classList.add('show'); clearTimeout(s._t); s._t = setTimeout(()=>s.classList.remove('show'), 1200);
+}
+
+buildNav();
+window.addEventListener('hashchange', render);
+render();
+/* 有 run 在跑时每 30s 自动重载（watcher 已把最新进度写进文件） */
+if ((DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running')) {
+  setInterval(() => { if (document.visibilityState === 'visible') location.reload(); }, 30000);
+}
+</script>
+</body>
+</html>
