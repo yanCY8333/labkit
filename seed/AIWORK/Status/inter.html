@@ -79,7 +79,7 @@
     <div class="bar">
       <span id="livemark"></span>
       <span id="updated"></span>
-      <button onclick="location.hash='fulllog'">全部流水</button>
+      <button onclick="location.hash='fulllog'">Full log</button>
     </div>
   </div>
 
@@ -87,23 +87,24 @@
 </div>
 
 <script>
-/* ================= AGENT: 收工时刷新这个块（唯一的维护点） =================
-   directions[] / branches[] 字段: id, name, status(active|confirmed|closed|planned),
+/* ================= AGENT: refresh this block when closing a session (the only maintenance point) =================
+   directions[] / branches[] fields: id, name, status(active|confirmed|closed|planned),
    goal, hypothesis, criteria, conclusion, evidence, panels[]
-   panels[] 契约（三种，title 必填，其余按 type）:
-     { title, source, type:"table",  columns:[...], rows:[[...],...] }   数字从结果文件原样拷贝
-     { title, source, type:"html",   html:"<svg .../>或<table ...>" }     内联 SVG/表格，禁外部库、禁 fetch
-     { title,          type:"placeholder", hint:"这块留給什么" }          空位，人点单后才填
-   live 区由 watcher 维护（见 AGENTS.md「While a run is active」）:
+   panels[] contract (three kinds, title required, rest per type):
+     { title, source, type:"table",  columns:[...], rows:[[...],...] }   numbers copied verbatim from result files
+     { title, source, type:"html",   html:"<svg .../> or <table ...>" }   inline SVG/table; no external libs, no fetch, no CDN
+     { title,          type:"placeholder", hint:"what this spot is for" }   reserved empty spot, filled on human request
+   live is maintained by the watcher (see AGENTS.md "While a run is active"):
      live: { updated:"...", runs:[ { name, dir, status(running|completed|failed), done, total,
                                      failed, current, elapsed, eta, note } ] }
-   时间戳一律真实机器时钟、含秒、带 UTC 偏移（如 2026-10-28 14:26:37 +08:00），不凑整不编造。
-   流水 TYPE（只记动作，六种）: N 新建 · R 运行 · F 修正(只追加修正记录，不覆写原记录) · M 节点(人确认+快照) · P 晋升(进 HUMAN) · X 失败。
-   没有"变更"类：记录 append-only，结论被推翻=原处划掉旧值追加新值，不存在回头改写。
-   讨论/推理/提问不进流水——想法只有落成动作才被记录。
-   规则: 每个 table/html panel 必须带 source(相对路径); 不编造数字; 表保持小(聚合/Top-N);
-         收工只刷新结构字段(status/conclusion/log/now), 统计 panel 按人要求或 milestone 摘要才填;
-         log 数组是窗口内的最近流水(≤40, 滚动归档时清空), logFull 可选存放跨窗口累计的完整流水(同样式)。 */
+   Timestamps: real machine clock, seconds, explicit UTC offset (e.g. 2026-10-28 14:26:37 +08:00). No rounding, no fabrication.
+   Log TYPE (six actions, nothing else): N new · R run · F fix (append correction, never overwrite) · M milestone (human confirmed + snapshot) · P promote (into HUMAN) · X fail.
+   There is no "update" type: records are append-only; an overturned conclusion is struck through with the new one appended, never rewritten.
+   Discussions/reasoning/questions are never logged — an idea enters the log only by becoming an action.
+   Rules: every table/html panel must carry source (relative path); never fabricate numbers; aggregate tables stay small,
+   per-bench tables (one row per item, full detail) are expected for multi-bench experiments; on close refresh only structural
+   fields (status/conclusion/log/now); statistics panels are filled on human request or milestone summary;
+   log[] is the current window's recent entries (≤40, cleared on archive roll); logFull[] optionally accumulates across windows. */
 const DATA = {
   updated: "{{DATETIME}}",
   project: { name: "{{NAME}}", goal: "{{GOAL}}" },
@@ -116,7 +117,7 @@ const DATA = {
   ],
   log: []
 };
-/* ===================== 以下不需要改动 ===================== */
+/* ===================== code below: do not touch ===================== */
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -126,7 +127,7 @@ const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
 
 function buildNav() {
   const sel = $('#nav');
-  let h = `<option value="overview">总览</option>`;
+  let h = `<option value="overview">Overview</option>`;
   for (const d of DATA.directions) {
     h += `<optgroup label="${esc(d.id)} ${esc(d.name)}">`;
     h += `<option value="${esc(d.id)}">${esc(d.id)} · ${esc(d.name)}</option>`;
@@ -158,8 +159,8 @@ function panelHtml(p) {
 }
 
 function noteBox(key) {
-  return `<div class="notehead"><span>我的笔记（本机保存）</span><span class="saved" data-saved>已保存</span></div>
-    <textarea data-note data-k="${esc(key)}" placeholder="写给未来的自己或 agent 的结论/疑问…" oninput="saveNote(this)"></textarea>`;
+  return `<div class="notehead"><span>Notes (local)</span><span class="saved" data-saved>Saved</span></div>
+    <textarea data-note data-k="${esc(key)}" oninput="saveNote(this)"></textarea>`;
 }
 
 function liveHtml() {
@@ -170,22 +171,22 @@ function liveHtml() {
     return `<div class="runcard">
       <span class="rname">${esc(r.name)}</span>
       <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
-      <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · 当前 ${esc(r.current)}`:''}${r.elapsed?` · 已跑 ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
+      <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · running ${esc(r.current)}`:''}${r.elapsed?` · elapsed ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
       ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}
       ${r.dir?`<div class="ps">${esc(r.dir)}</div>`:''}
     </div>`;
   }).join('');
-  return `<hr class="rule"><div class="sect">跑动中</div>${cards}
-    <div class="ps" style="color:var(--dim);font-size:11px">watcher 更新于 ${esc(L.updated||'?')}</div>`;
+  return `<hr class="rule"><div class="sect">Running</div>${cards}
+    <div class="ps" style="color:var(--dim);font-size:11px">watcher: ${esc(L.updated||'?')}</div>`;
 }
 
 function renderOverview() {
   let h = liveHtml();
-  h += `<hr class="rule"><div class="sect">现在</div><div class="kv">${
-    ['goal|目标','doing|正在做','next|下一步','blocked|阻塞']
+  h += `<hr class="rule"><div class="sect">Now</div><div class="kv">${
+    ['goal|goal','doing|doing','next|next','blocked|blocked']
       .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
-  h += `<hr class="rule"><div class="sect">方向与实验</div>`;
+  h += `<hr class="rule"><div class="sect">Directions</div>`;
   for (const d of DATA.directions) {
     h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
       <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
@@ -195,17 +196,17 @@ function renderOverview() {
         <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
         <span class="c">${esc(b.conclusion)}</span></div>`;
   }
-  if (!DATA.directions.length) h += `<p class="empty">还没有方向。</p>`;
-  h += `<hr class="rule"><div class="sect">最近流水</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'（无流水）')}</div>`;
+  if (!DATA.directions.length) h += `<p class="empty">No directions yet.</p>`;
+  h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'(no log entries)')}</div>`;
   $('#view').innerHTML = h;
 }
 
 function renderFullLog() {
   const rows = (DATA.logFull||DATA.log||[]);
   $('#view').innerHTML = `<div class="row" style="cursor:default;border:none;padding:0">
-      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">全部流水</span>
-      <span style="color:var(--dim);font-size:12px">${rows.length} 条</span></div>
-    <hr class="rule"><div class="log">${esc(rows.join('\n')||'（无流水）')}</div>`;
+      <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">Full log</span>
+      <span style="color:var(--dim);font-size:12px">${rows.length} entries</span></div>
+    <hr class="rule"><div class="log">${esc(rows.join('\n')||'(no log entries)')}</div>`;
   $('#nav').value = '';
 }
 
@@ -218,8 +219,8 @@ function renderDetail({page, dir, key}) {
       ${isDir?'':'<span style="color:var(--dim);font-size:12px">∈ '+esc(dir.id)+' '+esc(dir.name)+'</span>'}</div>
     <div class="kv" style="margin-top:8px">${fieldRow('goal',page.goal)}${fieldRow('hypothesis',page.hypothesis)}
       ${fieldRow('criteria',page.criteria)}${fieldRow('conclusion',page.conclusion)}${fieldRow('evidence',page.evidence)}</div>`;
-  h += `<hr class="rule"><div class="sect">统计</div>${(page.panels||[]).map(panelHtml).join('')||'<p class="empty">还没有统计 panel。</p>'}`;
-  h += `<hr class="rule"><div class="sect">笔记</div>${noteBox(key)}`;
+  h += `<hr class="rule"><div class="sect">Statistics</div>${(page.panels||[]).map(panelHtml).join('')||'<p class="empty">No panels yet.</p>'}`;
+  h += `<hr class="rule"><div class="sect">Notes</div>${noteBox(key)}`;
   $('#view').innerHTML = h;
 }
 
@@ -227,7 +228,7 @@ function render() {
   document.title = 'inter — ' + DATA.project.name;
   $('#title').textContent = DATA.project.name;
   $('#goal').textContent = DATA.project.goal;
-  $('#updated').textContent = '数据快照: ' + DATA.updated;
+  $('#updated').textContent = 'Snapshot: ' + DATA.updated;
   const running = (DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running');
   $('#livemark').innerHTML = running ? '<span class="live-dot"></span> live' : '';
   const key = location.hash.slice(1) || 'overview';
@@ -247,7 +248,7 @@ function saveNote(t) {
 buildNav();
 window.addEventListener('hashchange', render);
 render();
-/* 有 run 在跑时每 30s 自动重载（watcher 已把最新进度写进文件） */
+/* while a run is active: auto-reload every 30s (watcher writes progress into this file) */
 if ((DATA.live&&DATA.live.runs||[]).some(r=>r.status==='running')) {
   setInterval(() => { if (document.visibilityState === 'visible') location.reload(); }, 30000);
 }
