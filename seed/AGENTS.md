@@ -2,7 +2,7 @@
 
 Conversations die; the repo doesn't. This is the only rules file in the project — read it once and you know how to work.
 
-Naming: zones are ALL-CAPS (AIWORK / REVIEW / HUMAN), layers inside a zone are Capitalized (Prototype / Experiment / Status), everything below is lowercase. Files prefixed `agent_` are your protocol files: read them, write them, follow them. The human's manuals are `README_zh.md` / `README_en.md` at the root (README.md is the language jump); you don't need them.
+Naming: zones are ALL-CAPS (AIWORK / REVIEW / HUMAN), layers inside a zone are Capitalized (Prototype / Experiment / Status), everything below is lowercase. Files prefixed `agent_` are your protocol files: read them, write them, follow them. The human's manuals are `README_zh.md` / `README_en.md` at the root; you don't need them.
 
 ## How the repo is divided
 
@@ -58,7 +58,7 @@ Also: before copying any baseline into `AIWORK/Prototype/`, report the source UR
 
 ## Closing a session
 
-Rewrite the "Now" section of the current window in full: goal / doing / next / blocked. "Next" must be concrete — a command or a file, never "keep optimizing". Append one log line: `YYYY-MM-DD HH:MM:SS ±HH:MM | model/client | TYPE | one sentence  out=<artifact path>`.
+Rewrite the "Now" section of the current window in full: goal / doing / next / blocked. "Next" must be concrete — a command or a file, never "keep optimizing". Append one log line: `YYYY-MM-DD HH:MM:SS ±HH:MM | agent/model | TYPE | one sentence  out=<artifact path>`. The `agent/model` field is the driving agent first, then the model name — e.g. `opencode/deepseek-v4-pro` (never `cite/…` or a bare model id).
 
 Log TYPE — six actions, nothing else (this is labkit's own system; thoughts live only insofar as they became one of these):
 - `N` new (opened a direction / branch / experiment directory)
