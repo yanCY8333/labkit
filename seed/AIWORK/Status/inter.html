@@ -87,7 +87,7 @@
 </div>
 
 <script>
-/* ================= AGENT: refresh this block when closing a session (the only maintenance point) =================
+/* ============ AGENT: sync at every action start/end/X and at session close; DATA is the routine maintenance point ============
    directions[] / branches[] fields: id, name, status(active|confirmed|closed|planned),
    goal, hypothesis, criteria, conclusion, evidence, panels[]
    panels[] contract (three kinds, title required, rest per type):
@@ -99,12 +99,13 @@
                                      failed, current, elapsed, eta, note } ] }
    Timestamps: real machine clock, seconds, explicit UTC offset (e.g. 2026-10-28 14:26:37 +08:00). No rounding, no fabrication.
    Log TYPE (six actions, nothing else): N new · R run · F fix (append correction, never overwrite) · M milestone (human confirmed + snapshot) · P promote (into HUMAN) · X fail.
-   There is no "update" type: records are append-only; an overturned conclusion is struck through with the new one appended, never rewritten.
-   Discussions/reasoning/questions are never logged — an idea enters the log only by becoming an action.
+   Every loggable operation writes start immediately and end immediately after checked completion; interruptions write X immediately; resumes are new R start/end operations.
+   Records are append-only; there is no "update" type; discussions/reasoning/questions are never logged.
+   After every durable status-log write run agent_sync_logfull.py. log[] is the global recent 10; logFull[] is REQUIRED complete history
+   across current + archive and is never trimmed or replaced with recent-only. Arrays are oldest-first; recent and full render newest-first.
    Rules: every table/html panel must carry source (relative path); never fabricate numbers; aggregate tables stay small,
-   per-bench tables (one row per item, full detail) are expected for multi-bench experiments; on close refresh only structural
-   fields (status/conclusion/log/now); statistics panels are filled on human request or milestone summary;
-   log[] is the current window's recent entries (≤40, cleared on archive roll); logFull[] optionally accumulates across windows. */
+   per-bench tables (one row per item, full detail) are expected for multi-bench experiments; structural fields and statistics
+   are refreshed on change or human request; statistics panels are filled on human request or milestone summary. */
 const DATA = {
   updated: "{{DATETIME}}",
   project: { name: "{{NAME}}", goal: "{{GOAL}}" },
@@ -197,12 +198,12 @@ function renderOverview() {
         <span class="c">${esc(b.conclusion)}</span></div>`;
   }
   if (!DATA.directions.length) h += `<p class="empty">No directions yet.</p>`;
-  h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'(no log entries)')}</div>`;
+  h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc((DATA.log||[]).slice(-10).reverse().join('\n')||'(no log entries)')}</div>`;
   $('#view').innerHTML = h;
 }
 
 function renderFullLog() {
-  const rows = (DATA.logFull||DATA.log||[]);
+  const rows = (DATA.logFull||[]).slice().reverse();
   $('#view').innerHTML = `<div class="row" style="cursor:default;border:none;padding:0">
       <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">Full log</span>
       <span style="color:var(--dim);font-size:12px">${rows.length} entries</span></div>

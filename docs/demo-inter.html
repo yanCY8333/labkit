@@ -87,7 +87,7 @@
 </div>
 
 <script>
-/* ================= AGENT: refresh this block when closing a session (the only maintenance point) =================
+/* ============ AGENT: sync at every action start/end/X and at session close; DATA is the routine maintenance point ============
    directions[] / branches[] fields: id, name, status(active|confirmed|closed|planned),
    goal, hypothesis, criteria, conclusion, evidence, panels[]
    panels[] contract (three kinds, title required, rest per type):
@@ -99,14 +99,15 @@
                                      failed, current, elapsed, eta, note } ] }
    Timestamps: real machine clock, seconds, explicit UTC offset (e.g. 2026-10-28 14:26:37 +08:00). No rounding, no fabrication.
    Log TYPE (six actions, nothing else): N new · R run · F fix (append correction, never overwrite) · M milestone (human confirmed + snapshot) · P promote (into HUMAN) · X fail.
-   There is no "update" type: records are append-only; an overturned conclusion is struck through with the new one appended, never rewritten.
-   Discussions/reasoning/questions are never logged — an idea enters the log only by becoming an action.
+   Every loggable operation writes start immediately and end immediately after checked completion; interruptions write X immediately; resumes are new R start/end operations.
+   Records are append-only; there is no "update" type; discussions/reasoning/questions are never logged.
+   After every durable status-log write run agent_sync_logfull.py. log[] is the global recent 10; logFull[] is REQUIRED complete history
+   across current + archive and is never trimmed or replaced with recent-only. Arrays are oldest-first; recent and full render newest-first.
    Rules: every table/html panel must carry source (relative path); never fabricate numbers; aggregate tables stay small,
-   per-bench tables (one row per item, full detail) are expected for multi-bench experiments; on close refresh only structural
-   fields (status/conclusion/log/now); statistics panels are filled on human request or milestone summary;
-   log[] is the current window's recent entries (≤40, cleared on archive roll); logFull[] optionally accumulates across windows. */
+   per-bench tables (one row per item, full detail) are expected for multi-bench experiments; structural fields and statistics
+   are refreshed on change or human request; statistics panels are filled on human request or milestone summary. */
 const DATA = {
-  updated: "2026-10-28 16:34:08 +08:00",
+  updated: "2026-10-28 16:35:02 +08:00",
   project: { name: "example-project", goal: "A populated, anonymized inter demonstration; agent names and log entries are fictional." },
   now: {
     goal: "Finish the active reference queue and establish a matched comparison against the frozen baseline",
@@ -391,39 +392,59 @@ const DATA = {
       ] }
   ],
   log: [
-    "2026-10-27 19:48:26 +08:00 | codex/gpt-5.6-sol | R | Queue evidence extracted locally without model weights  out=e002, e003",
-    "2026-10-27 19:55:05 +08:00 | dsh/deepseek-v4.1-flash | F | Runtime location corrected and environment record updated  out=environ/env.md",
-    "2026-10-27 20:56:59 +08:00 | opencode/kimi-4.1-pro | N | Added dropdown navigation, experiment pages, and statistics panels  out=inter.html",
-    "2026-10-27 21:21:37 +08:00 | codex/gpt-5.6-sol | F | Corrected branch layout by restoring one subdirectory per queue  out=b03/",
-    "2026-10-27 21:21:37 +08:00 | dsh/deepseek-v4.1-flash | N | Established e000 baseline from a frozen 384-run queue  out=e000",
-    "2026-10-28 14:21:00 +08:00 | opencode/kimi-4.1-pro | F | Sparse arm marked record-only after review; e000 split into two observation branches  out=e000, e003",
-    "2026-10-28 14:25:39 +08:00 | opencode/glm-5.3 | N | Added per-item tables to e000 and e003  out=inter.html, per_bench.csv",
-    "2026-10-28 16:10:36 +08:00 | dsh/deepseek-v4.1-flash | F | Restored the approved reference implementation and verified file integrity  out=Prototype/reference",
-    "2026-10-28 16:34:08 +08:00 | opencode/kimi-4.1-pro | N | Opened e000/b03 reference-B and froze its full-observation protocol  out=e000/b03",
-    "2026-10-28 16:34:08 +08:00 | codex/gpt-5.6-sol | R | Passed five correctness tests and an accelerator smoke; launched the 96-run queue and watcher  out=e000/b03/queue-01"
+    "2026-10-28 14:21:00 +08:00 | opencode/kimi-4.1-pro | F | Completed the scope correction: sparse arm record-only, e000 split into two observation branches  out=e000, e003",
+    "2026-10-28 14:25:32 +08:00 | opencode/glm-5.3 | N | Started adding per-item tables to e000 and e003  out=inter.html, per_bench.csv",
+    "2026-10-28 14:25:39 +08:00 | opencode/glm-5.3 | N | Completed the per-item tables  out=inter.html, per_bench.csv",
+    "2026-10-28 16:10:21 +08:00 | dsh/deepseek-v4.1-flash | F | Started restoring the approved reference implementation into Prototype  out=Prototype/reference",
+    "2026-10-28 16:10:36 +08:00 | dsh/deepseek-v4.1-flash | F | Completed the restore; every file hash-verified against the approved commit  out=Prototype/reference",
+    "2026-10-28 16:33:54 +08:00 | opencode/kimi-4.1-pro | N | Started opening e000/b03 reference-B and freezing its full-observation protocol  out=e000/b03",
+    "2026-10-28 16:34:08 +08:00 | opencode/kimi-4.1-pro | N | Completed opening e000/b03; protocol frozen before the first run  out=e000/b03",
+    "2026-10-28 16:34:15 +08:00 | codex/gpt-5.6-sol | R | Started pre-launch checks: five correctness tests and an accelerator smoke  out=e000/b03/queue-01",
+    "2026-10-28 16:34:47 +08:00 | codex/gpt-5.6-sol | R | Completed pre-launch checks (5/5 passed, smoke clean)  out=e000/b03/queue-01",
+    "2026-10-28 16:35:02 +08:00 | codex/gpt-5.6-sol | R | Started the 96-run reference-B queue with a 60s watcher  out=e000/b03/queue-01"
   ],
   logFull: [
-    "2026-10-24 09:18:12 +08:00 | dsh/deepseek-v4.1-flash | N | Opened e001 variant-A and froze its evaluation criteria before the first run  out=e001",
-    "2026-10-24 09:22:47 +08:00 | dsh/deepseek-v4.1-flash | R | Launched the 12-item paired evaluation at 50k updates  out=e001/b01/queue-01",
-    "2026-10-24 11:06:31 +08:00 | codex/gpt-5.6-sol | X | Worker 2 exhausted memory; completed items were preserved and the anomaly was recorded  out=e001/b01/queue-01",
-    "2026-10-24 11:19:05 +08:00 | dsh/deepseek-v4.1-flash | F | Reduced the worker count and resumed from the last completed item; original failure retained  out=e001/b01/queue-01",
-    "2026-10-24 18:42:16 +08:00 | opencode/kimi-4.1-pro | M | Human confirmed M1 after reviewing the paired results; snapshot sealed  out=REVIEW/m1-closure",
-    "2026-10-24 19:03:55 +08:00 | opencode/kimi-4.1-pro | P | Promoted the approved closure summary into the durable record  out=HUMAN/m1-summary.md",
-    "2026-10-25 10:14:22 +08:00 | opencode/glm-5.3 | N | Opened e002 variant-B with matched-reference controls  out=e002",
-    "2026-10-25 10:26:40 +08:00 | dsh/deepseek-v4.1-flash | R | Launched the eight-level setting scan at 100k updates  out=e002/b01/queue-01",
-    "2026-10-25 17:40:09 +08:00 | opencode/kimi-4.1-pro | M | Human confirmed M3 and reviewed the aggregate table plus per-item evidence  out=REVIEW/m3",
-    "2026-10-26 09:08:33 +08:00 | opencode/glm-5.3 | N | Opened e003 variant-C and registered three component-comparison branches  out=e003",
-    "2026-10-26 09:31:18 +08:00 | dsh/deepseek-v4.1-flash | R | Launched the 384-run full-observation queue with a passive watcher  out=e003/b03/queue-01",
-    "2026-10-27 19:48:26 +08:00 | codex/gpt-5.6-sol | R | Queue evidence extracted locally without model weights  out=e002, e003",
-    "2026-10-27 19:55:05 +08:00 | dsh/deepseek-v4.1-flash | F | Runtime location corrected and environment record updated  out=environ/env.md",
-    "2026-10-27 20:56:59 +08:00 | opencode/kimi-4.1-pro | N | Added dropdown navigation, experiment pages, and statistics panels  out=inter.html",
-    "2026-10-27 21:21:37 +08:00 | codex/gpt-5.6-sol | F | Corrected branch layout by restoring one subdirectory per queue  out=b03/",
-    "2026-10-27 21:21:37 +08:00 | dsh/deepseek-v4.1-flash | N | Established e000 baseline from a frozen 384-run queue  out=e000",
-    "2026-10-28 14:21:00 +08:00 | opencode/kimi-4.1-pro | F | Sparse arm marked record-only after review; e000 split into two observation branches  out=e000, e003",
-    "2026-10-28 14:25:39 +08:00 | opencode/glm-5.3 | N | Added per-item tables to e000 and e003  out=inter.html, per_bench.csv",
-    "2026-10-28 16:10:36 +08:00 | dsh/deepseek-v4.1-flash | F | Restored the approved reference implementation and verified file integrity  out=Prototype/reference",
-    "2026-10-28 16:34:08 +08:00 | opencode/kimi-4.1-pro | N | Opened e000/b03 reference-B and froze its full-observation protocol  out=e000/b03",
-    "2026-10-28 16:34:08 +08:00 | codex/gpt-5.6-sol | R | Passed five correctness tests and an accelerator smoke; launched the 96-run queue and watcher  out=e000/b03/queue-01"
+    "2026-10-24 09:18:04 +08:00 | dsh/deepseek-v4.1-flash | N | Started opening e001 variant-A; evaluation criteria frozen before the first run  out=e001",
+    "2026-10-24 09:18:12 +08:00 | dsh/deepseek-v4.1-flash | N | Completed opening e001  out=e001",
+    "2026-10-24 09:22:41 +08:00 | dsh/deepseek-v4.1-flash | R | Started the 12-item paired evaluation at 50k updates  out=e001/b01/queue-01",
+    "2026-10-24 11:06:31 +08:00 | codex/gpt-5.6-sol | X | Worker 2 exhausted memory; completed items preserved and the anomaly recorded  out=e001/b01/queue-01",
+    "2026-10-24 11:18:57 +08:00 | dsh/deepseek-v4.1-flash | R | Started resuming the queue with a reduced worker count from the last completed item  out=e001/b01/queue-01",
+    "2026-10-24 11:19:05 +08:00 | dsh/deepseek-v4.1-flash | R | Completed the resume; original failure retained on record  out=e001/b01/queue-01",
+    "2026-10-24 18:42:08 +08:00 | opencode/kimi-4.1-pro | M | Started sealing the M1 snapshot after human confirmation  out=REVIEW/m1-closure",
+    "2026-10-24 18:42:16 +08:00 | opencode/kimi-4.1-pro | M | Completed the M1 snapshot; manifest written  out=REVIEW/m1-closure",
+    "2026-10-24 19:03:47 +08:00 | opencode/kimi-4.1-pro | P | Started promoting the approved closure summary into the durable record  out=HUMAN/m1-summary.md",
+    "2026-10-24 19:03:55 +08:00 | opencode/kimi-4.1-pro | P | Completed the promotion  out=HUMAN/m1-summary.md",
+    "2026-10-25 10:14:14 +08:00 | opencode/glm-5.3 | N | Started opening e002 variant-B with matched-reference controls  out=e002",
+    "2026-10-25 10:14:22 +08:00 | opencode/glm-5.3 | N | Completed opening e002  out=e002",
+    "2026-10-25 10:26:33 +08:00 | dsh/deepseek-v4.1-flash | R | Started launching the eight-level setting scan at 100k updates  out=e002/b01/queue-01",
+    "2026-10-25 10:26:40 +08:00 | dsh/deepseek-v4.1-flash | R | Completed launching the scan; watcher attached  out=e002/b01/queue-01",
+    "2026-10-25 17:40:01 +08:00 | opencode/kimi-4.1-pro | M | Started the M3 snapshot after human confirmation  out=REVIEW/m3",
+    "2026-10-25 17:40:09 +08:00 | opencode/kimi-4.1-pro | M | Completed the M3 snapshot  out=REVIEW/m3",
+    "2026-10-26 09:08:25 +08:00 | opencode/glm-5.3 | N | Started opening e003 variant-C with three component-comparison branches  out=e003",
+    "2026-10-26 09:08:33 +08:00 | opencode/glm-5.3 | N | Completed opening e003  out=e003",
+    "2026-10-26 09:31:10 +08:00 | dsh/deepseek-v4.1-flash | R | Started launching the 384-run full-observation queue with a passive watcher  out=e003/b03/queue-01",
+    "2026-10-26 09:31:18 +08:00 | dsh/deepseek-v4.1-flash | R | Completed launching the queue  out=e003/b03/queue-01",
+    "2026-10-27 19:48:19 +08:00 | codex/gpt-5.6-sol | R | Started extracting queue evidence locally without model weights  out=e002, e003",
+    "2026-10-27 19:48:26 +08:00 | codex/gpt-5.6-sol | R | Completed the evidence extraction  out=e002, e003",
+    "2026-10-27 19:54:58 +08:00 | dsh/deepseek-v4.1-flash | F | Started correcting the runtime location and updating the environment record  out=environ/env.md",
+    "2026-10-27 19:55:05 +08:00 | dsh/deepseek-v4.1-flash | F | Completed the correction  out=environ/env.md",
+    "2026-10-27 20:56:51 +08:00 | opencode/kimi-4.1-pro | N | Started adding dropdown navigation, experiment pages, and statistics panels  out=inter.html",
+    "2026-10-27 20:56:59 +08:00 | opencode/kimi-4.1-pro | N | Completed the inter rework  out=inter.html",
+    "2026-10-27 21:21:29 +08:00 | codex/gpt-5.6-sol | F | Started correcting the branch layout, restoring one subdirectory per queue  out=b03/",
+    "2026-10-27 21:21:37 +08:00 | codex/gpt-5.6-sol | F | Completed the layout correction  out=b03/",
+    "2026-10-27 21:21:40 +08:00 | dsh/deepseek-v4.1-flash | N | Started establishing the e000 baseline from the frozen 384-run queue  out=e000",
+    "2026-10-27 21:21:48 +08:00 | dsh/deepseek-v4.1-flash | N | Completed the e000 baseline extraction  out=e000",
+    "2026-10-28 14:20:52 +08:00 | opencode/kimi-4.1-pro | F | Started the scope correction from review: sparse arm record-only, e000 split into two observation branches  out=e000, e003",
+    "2026-10-28 14:21:00 +08:00 | opencode/kimi-4.1-pro | F | Completed the scope correction: sparse arm record-only, e000 split into two observation branches  out=e000, e003",
+    "2026-10-28 14:25:32 +08:00 | opencode/glm-5.3 | N | Started adding per-item tables to e000 and e003  out=inter.html, per_bench.csv",
+    "2026-10-28 14:25:39 +08:00 | opencode/glm-5.3 | N | Completed the per-item tables  out=inter.html, per_bench.csv",
+    "2026-10-28 16:10:21 +08:00 | dsh/deepseek-v4.1-flash | F | Started restoring the approved reference implementation into Prototype  out=Prototype/reference",
+    "2026-10-28 16:10:36 +08:00 | dsh/deepseek-v4.1-flash | F | Completed the restore; every file hash-verified against the approved commit  out=Prototype/reference",
+    "2026-10-28 16:33:54 +08:00 | opencode/kimi-4.1-pro | N | Started opening e000/b03 reference-B and freezing its full-observation protocol  out=e000/b03",
+    "2026-10-28 16:34:08 +08:00 | opencode/kimi-4.1-pro | N | Completed opening e000/b03; protocol frozen before the first run  out=e000/b03",
+    "2026-10-28 16:34:15 +08:00 | codex/gpt-5.6-sol | R | Started pre-launch checks: five correctness tests and an accelerator smoke  out=e000/b03/queue-01",
+    "2026-10-28 16:34:47 +08:00 | codex/gpt-5.6-sol | R | Completed pre-launch checks (5/5 passed, smoke clean)  out=e000/b03/queue-01",
+    "2026-10-28 16:35:02 +08:00 | codex/gpt-5.6-sol | R | Started the 96-run reference-B queue with a 60s watcher  out=e000/b03/queue-01"
   ]
 };
 /* ===================== code below: do not touch ===================== */
@@ -506,12 +527,12 @@ function renderOverview() {
         <span class="c">${esc(b.conclusion)}</span></div>`;
   }
   if (!DATA.directions.length) h += `<p class="empty">No directions yet.</p>`;
-  h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc(((DATA.logFull||DATA.log)||[]).slice(-10).join('\n')||'(no log entries)')}</div>`;
+  h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc((DATA.log||[]).slice(-10).reverse().join('\n')||'(no log entries)')}</div>`;
   $('#view').innerHTML = h;
 }
 
 function renderFullLog() {
-  const rows = (DATA.logFull||DATA.log||[]);
+  const rows = (DATA.logFull||[]).slice().reverse();
   $('#view').innerHTML = `<div class="row" style="cursor:default;border:none;padding:0">
       <span class="name" style="font-family:'Times New Roman',serif;font-size:20px">Full log</span>
       <span style="color:var(--dim);font-size:12px">${rows.length} entries</span></div>

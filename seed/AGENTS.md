@@ -56,9 +56,13 @@ Once copied, the snapshot is dead. Never "fix" it afterwards.
 
 Also: before copying any baseline into `AIWORK/Prototype/`, report the source URL and commit to the human for approval. After approval it never changes; make variants by copying into Experiment.
 
-## Closing a session
+## Logging and closing a session
 
-Rewrite the "Now" section of the current window in full: goal / doing / next / blocked. "Next" must be concrete — a command or a file, never "keep optimizing". Append one log line: `YYYY-MM-DD HH:MM:SS ±HH:MM | agent/model | TYPE | one sentence  out=<artifact path>`. The `agent/model` field is the driving agent first, then the model name — e.g. `opencode/deepseek-v4-pro` (never `cite/…` or a bare model id).
+Every loggable operation gets **two durable entries at the event**: a start entry written immediately before the operation starts and an end entry written immediately after it finishes and its output is checked. Never wait until session close to record an operation, and never batch the start and end entries afterwards. The line format is `YYYY-MM-DD HH:MM:SS ±HH:MM | agent/model | TYPE | one sentence  out=<artifact path>`. The `agent/model` field is the driving agent first, then the model name — e.g. `opencode/deepseek-v4-pro` (never `cite/…` or a bare model id).
+
+The start and successful end use the same TYPE, with `started` / `completed` stated explicitly in the sentence. This applies even to effectively instantaneous operations; if both real timestamps fall in the same second, keep both entries. An error or interruption is recorded immediately as `X` at its actual detection time — no fabricated successful end. A later resume is a new `R` operation with its own start and end entries. Do not synthesize missing historical start/end entries: history remains append-only.
+
+At session close, rewrite the "Now" section of the current window in full: goal / doing / next / blocked. "Next" must be concrete — a command or a file, never "keep optimizing". Closing is a consistency check, not a substitute for event-time logging: verify that every finished operation has its end entry and every active operation has only its genuine start/current state.
 
 Log TYPE — six actions, nothing else (this is labkit's own system; thoughts live only insofar as they became one of these):
 - `N` new (opened a direction / branch / experiment directory)
@@ -74,13 +78,11 @@ Discussions, reasoning, and questions are never logged. If an idea matters, it b
 
 **Timestamps**: always real wall-clock time read from the machine at the moment of writing, seconds included, with explicit UTC offset (e.g. `2026-10-28 14:26:37 +08:00`). Never round, never fabricate neat values, never copy an old timestamp forward. If you cannot read the clock, say so instead of guessing.
 
-Also refresh the DATA block in `AIWORK/Status/inter.html` — that block is the page's only maintenance point; do not touch the code below it. Refresh on close:
-- `updated`, `now`, last ~10 `log` lines;
-- structural fields of directions/branches: `status`, `conclusion`, `goal` (only when they changed).
+Immediately after **every** durable start/end/`X` write, run `uv run python AIWORK/Status/agent_sync_logfull.py` to mirror it into the DATA block in `AIWORK/Status/inter.html`; the watcher is not a substitute for this. The sync keeps `updated` and the last ~10 `log` entries current, and maintains `logFull` as the mandatory complete history across every current and archived status window. **Never trim, overwrite with recent-only data, or fall back to recent-only for `logFull`.** Both recent and full views render newest-first. At session close also refresh `now` and changed structural fields of directions/branches (`status`, `conclusion`, `goal`). The DATA block is the page's only routine maintenance point; do not touch the code below it except for an explicit display repair like the newest-first fix.
 
 Statistics panels are filled **on demand, not by default**: when the human asks for a table/figure, or when a milestone summary warrants one. The panel contract (documented above the DATA block): `type:"table"` with columns/rows copied verbatim from result files, or `type:"html"` with inline SVG/table (no external libraries, no fetch, no CDN), or `type:"placeholder"` reserving an empty patch. Every table/html panel must carry `source` (relative path). Never fabricate numbers. Two kinds of tables, both legitimate: **aggregate tables** (means, summaries — keep small) and **per-bench tables** (one row per image/dataset/subject with full numeric detail — expected whenever the experiment runs across many benches; the human verifies anomalies bench by bench). Prefer shipping a per-bench CSV in the branch directory alongside. Don't pool numbers across different budgets/protocols.
 
-Log only what matters, and only as one of the six TYPEs above. Don't log reading, searching, or thinking; conclusion evolution is recorded in the README itself (strike + append), not as a log entry. When the log exceeds 40 entries, or the window is older than 7 days, move it into `archive/` (renamed `agent_status_<start>_<end>.md`) and create a fresh window (`agent_status_<stamp>_current.md`), carrying over the "Environment" and "Now" sections, log emptied.
+Log only what matters, and only as one of the six TYPEs above. Don't log reading, searching, or thinking; conclusion evolution is recorded in the README itself (strike + append), not as a log entry. When the log exceeds 40 entries, or the window is older than 7 days, move it into `archive/` (renamed `agent_status_<start>_<end>.md`) and create a fresh window (`agent_status_<stamp>_current.md`), carrying over the "Environment" and "Now" sections, log emptied. Run the sync immediately after every archive roll: `logFull` must remain continuous across the archive and the new window.
 
 At the first work session, ask the human once: environment, how to run, where artifacts go, what's forbidden — write it into the window's "Environment" section; update only on change.
 
