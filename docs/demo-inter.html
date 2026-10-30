@@ -90,6 +90,8 @@
 /* ============ AGENT: sync at every action start/end/X and at session close; DATA is the routine maintenance point ============
    directions[] / branches[] fields: id, name, status(active|confirmed|closed|planned),
    goal, hypothesis, criteria, conclusion, evidence, panels[]
+   Array order of directions/branches does not matter: the page sorts them by numeric id ascending;
+   append new entries anywhere in the array. Only log arrays are order-sensitive (oldest-first).
    panels[] contract (three kinds, title required, rest per type):
      { title, source, type:"table",  columns:[...], rows:[[...],...] }   numbers copied verbatim from result files
      { title, source, type:"html",   html:"<svg .../> or <table ...>" }   inline SVG/table; no external libs, no fetch, no CDN
@@ -455,13 +457,18 @@ const badge = st => `<span class="badge s-${esc(st||'planned')}">${esc(st||'?')}
 const noteKey = k => `inter-note:${DATA.project.name}:${k}`;
 const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
 
+// Experiment structure is numeric ascending; only time logs are newest-first.
+const byExperimentId = items => [...(items || [])].sort(
+  (a, b) => a.id.localeCompare(b.id, 'en', {numeric: true})
+);
+
 function buildNav() {
   const sel = $('#nav');
   let h = `<option value="overview">Overview</option>`;
-  for (const d of DATA.directions) {
+  for (const d of byExperimentId(DATA.directions)) {
     h += `<optgroup label="${esc(d.id)} ${esc(d.name)}">`;
     h += `<option value="${esc(d.id)}">${esc(d.id)} · ${esc(d.name)}</option>`;
-    for (const b of d.branches || [])
+    for (const b of byExperimentId(d.branches))
       h += `<option value="${esc(d.id + ':' + b.id)}">&nbsp;&nbsp;${esc(b.id)} · ${esc(b.name)}</option>`;
     h += `</optgroup>`;
   }
@@ -517,11 +524,11 @@ function renderOverview() {
     ['goal|goal','doing|doing','next|next','blocked|blocked']
       .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
   h += `<hr class="rule"><div class="sect">Directions</div>`;
-  for (const d of DATA.directions) {
+  for (const d of byExperimentId(DATA.directions)) {
     h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
       <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
       <span class="c">${esc(d.conclusion)}</span></div>`;
-    for (const b of d.branches || [])
+    for (const b of byExperimentId(d.branches))
       h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
         <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
         <span class="c">${esc(b.conclusion)}</span></div>`;
