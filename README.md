@@ -29,7 +29,7 @@ HUMAN/       审核后晋升的最高净值内容，只能由人类最终确认�
 - append-only，只做增量记录。流水有六种动作（N 新建 / R 运行 / F 修正 / M 节点 / P 晋升 / X 失败），讨论和推理在 agent 内部，不作为事实进入工作区。
 - 不做总结性结论，只做实验数据汇总，结论由人类决定。
 - 通过配置关键部分的 git 实现完整证据链存在。
-- inter.html：`AIWORK/Status/` 下的自包含总览页——方向/实验/结论/统计/逐 bench 表 + 人类的本机笔记；状态日志由 `agent_sync_logfull.py` 在每次写入后镜像进 DATA 块（recent 10 + 完整 logFull，均最新在前）；跑动实验由 watcher 刷新 live 区，页面自动重载。
+- inter.html：`AIWORK/Status/` 下的自包含总览页——方向/实验/结论/统计/逐 bench 表（方向可折叠）+ 人类的本机笔记；状态日志由 `agent_sync_logfull.py` 在每次写入后镜像进 DATA 块（按时间戳排序，recent 10 + 完整 logFull，均最新在前）；跑动实验由各设备的 watcher 写 `live/<run_id>.json`、syncer 加锁合并（多设备并行，互不覆盖），页面自动重载。
 
 ## 示例
 

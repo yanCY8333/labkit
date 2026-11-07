@@ -14,6 +14,17 @@ Ask the human once at the first work session, then record here.
 - next: read AGENTS.md, create the first experiment
 - blocked: none
 
+<!-- Optional: repeat this subsection for each independent device/run; completed subsections are removed individually at close.
+### Running — <run_id>
+- device: <host / accelerator>
+- status: running
+- run: <direction/branch/queue>
+- doing: <current item>
+- next: <concrete command or file>
+- blocked: <blocker or none>
+- watch: AIWORK/Status/live/<run_id>.json
+-->
+
 ## Log
 
 <!-- One entry per line, max 40 entries, newest first; on archive roll the log is emptied into the archive window.

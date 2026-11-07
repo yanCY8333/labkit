@@ -67,6 +67,10 @@
   .runcard .rline{font-size:12.5px;color:#444}
   .prog{background:#e8e8e8;border-radius:3px;height:10px;overflow:hidden;margin:4px 0}
   .prog>div{background:var(--ok);height:100%}
+  .tgl{flex:0 0 auto;width:20px;height:20px;line-height:1;padding:0 2px;margin:0;
+       font-size:10.5px;color:var(--dim);background:#fff;align-self:center}
+  .bcount{display:inline-block;padding:0 8px;border-radius:3px;font-size:11.5px;color:var(--dim);
+          border:1px solid var(--line);background:#f5f5f5;vertical-align:2px}
 </style>
 </head>
 <body>
@@ -118,8 +122,16 @@ const DATA = {
     blocked: "none (M1–M4 snapshots still await review)"
   },
   live: { updated: "2026-10-28 16:54:34 +08:00", runs: [
-    { name: "queue-01", dir: "e000/b03/queue-01", status: "running", done: 5, total: 96,
-      failed: 0, current: "item_00 / cfg-12x20 / full / reference-B", elapsed: 1329, eta: 24188, note: "" }
+    { run_id: "e000-b03-queue-01--workstation-rtx5090", name: "e000/b03 reference-B queue",
+      device: { id: "workstation-rtx5090", label: "workstation / RTX 5090 32 GiB", host: "workstation", accelerator: "NVIDIA GeForce RTX 5090" },
+      dir: "e000/b03/queue-01", status: "running", done: 5, total: 96,
+      failed: 0, current: "item_00 / cfg-12x20 / full / reference-B", elapsed: 1329, eta: 24188,
+      note: "", updated: "2026-10-28 16:54:34 +08:00" },
+    { run_id: "e002-b01-scan--schoolserver-gpu03", name: "e002/b01 range re-scan",
+      device: { id: "schoolserver-gpu03", label: "schoolServer gpu03 / RTX 4090 24 GiB", host: "gpu03", accelerator: "NVIDIA GeForce RTX 4090" },
+      dir: "gpu03:e002/b01/queue-04", status: "running", done: 12, total: 48,
+      failed: 0, current: "L05 / 0.5 range / seed 3", elapsed: 8841, eta: 26530,
+      note: "second device, same page", updated: "2026-10-28 16:53:51 +08:00" }
   ] },
   directions: [
     { id: "e000", name: "baseline", status: "confirmed",
@@ -455,6 +467,13 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const badge = st => `<span class="badge s-${esc(st||'planned')}">${esc(st||'?')}</span>`;
 const noteKey = k => `inter-note:${DATA.project.name}:${k}`;
+const foldKey = d => `inter-fold:${DATA.project.name}:${d}`;
+const dirOpen = d => localStorage.getItem(foldKey(d)) !== '1';
+const toggleDir = (e, d) => {
+  e.stopPropagation();
+  localStorage.setItem(foldKey(d), dirOpen(d) ? '1' : '0');
+  render();
+};
 const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
 
 // Experiment structure is numeric ascending; only time logs are newest-first.
@@ -525,13 +544,18 @@ function renderOverview() {
       .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
   h += `<hr class="rule"><div class="sect">Directions</div>`;
   for (const d of byExperimentId(DATA.directions)) {
+    const open = dirOpen(d.id);
+    const branches = byExperimentId(d.branches);
     h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
+      <button class="tgl" title="${open?'Collapse':'Expand'} branches" onclick="toggleDir(event,'${esc(d.id)}')">${open?'▾':'▸'}</button>
       <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
+      ${open?'':`<span class="bcount" title="${branches.length} branches (collapsed)">${branches.length} b</span>`}
       <span class="c">${esc(d.conclusion)}</span></div>`;
-    for (const b of byExperimentId(d.branches))
-      h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
-        <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
-        <span class="c">${esc(b.conclusion)}</span></div>`;
+    if (open)
+      for (const b of branches)
+        h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
+          <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
+          <span class="c">${esc(b.conclusion)}</span></div>`;
   }
   if (!DATA.directions.length) h += `<p class="empty">No directions yet.</p>`;
   h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc((DATA.log||[]).slice(-10).reverse().join('\n')||'(no log entries)')}</div>`;

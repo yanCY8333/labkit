@@ -32,14 +32,17 @@ Fill the README header's `artifacts` and `conclusion`, add a results section in 
 
 ## While a run is active
 
-Long-running training or queue jobs are never left unwatched. When you launch one:
+Long-running training or queue jobs are never left unwatched. **Multiple independent devices and multiple queues may be active at once.** Every independent run has a stable `run_id` (unique across the project, preserved on resume) and a `device` record (`id`, optional `label`, `host`, `accelerator`). One device may own several runs, and one run may never overwrite another run's live state.
 
-1. **Start a watcher.** A detached process (separate terminal, background task — whatever survives your session) that periodically (e.g. every 60s) reads the queue's state (`batch.json` / progress files) and writes a small `agent_watch.json` next to the current status window in `AIWORK/Status/`, containing: run name, direction/branch, status (running/completed/failed), done/total/failed counts, current item, elapsed, ETA, timestamp.
-2. **Mirror into inter.** Each watcher tick also rewrites the `live` field of `AIWORK/Status/inter.html`'s DATA block: `{ updated, runs: [...] }` — one entry per active queue. The page auto-reloads every 30s while any run is `running`, so the human sees live progress by keeping the page open. Never touch the code below the DATA block for this.
-3. **Report anomalies.** The watcher is passive: it reports (first failure, stall: no progress for 3+ ticks, completion), it does not restart or modify anything. When something fails, the finding goes into the conversation and the log line; the queue's own `--resume` semantics handle recovery.
-4. **Close it out.** When all runs complete or stop, the watcher writes final state, exits, and the `live` block is emptied at your next session close. Live info is transient — durable results go through the normal README/panel/milestone path.
+When you launch one:
 
-Watcher implementations live inside the experiment's own code/ directory (project property, not labkit property). A loop of `--monitor`/`--once` output parsing, or a tiny Python script, both qualify.
+1. **Start a watcher.** A detached process that periodically (e.g. every 60s) reads queue state (`batch.json` / progress files). Each tick writes `AIWORK/Status/live/<run_id>.json` with: `run_id`, `name`, `device`, `dir`, `status` (`running`/`completed`/`failed`), `done`, `total`, `failed`, `current`, `elapsed`, `eta`, `note`, `updated`. Use a real wall-clock timestamp with UTC offset. The per-run file is the only cross-device live contract; remote watchers must deliver it to this shared path (transport is outside labkit).
+2. **Merge through the existing syncer.** After writing the per-run file, run `uv run python AIWORK/Status/agent_sync_logfull.py`. New watchers may instead call its `write_live_entry(payload)` helper to perform both steps. The syncer merges all per-run files by `run_id`, preserves legacy entries without one, and writes `DATA.live` atomically under a process lock. Watchers must never rewrite the whole `live` field or another device's entry. The page auto-reloads every 30s while any run is `running`.
+3. **Allow several Running entries.** The current status window's "Now" section may contain repeated `### Running — <run_id>` subsections with `device`, `status`, `run`, `doing`, `next`, `blocked`, and `watch: AIWORK/Status/live/<run_id>.json`. Keep the global goal/doing/next/blocked summary as well. At close, remove completed subsections individually; active subsections remain untouched.
+4. **Report anomalies.** The watcher is passive: it reports first failure, stall (no progress for 3+ ticks), and completion. It does not restart or modify the queue. Findings go into the conversation and log; recovery uses the queue's own `--resume` semantics.
+5. **Close runs independently.** Each watcher writes its final state and exits. Completed per-run files are removed only at the next session close, and only for that completed run; other devices' Running entries stay live. If no live entries remain, `DATA.live.runs` becomes empty. Durable results always use the normal README/panel/milestone path.
+
+Watcher implementations live inside the experiment's own code/ directory (project property, not labkit property). A loop of `--monitor`/`--once` output parsing, or a tiny Python script, both qualify. Legacy `agent_watch.json` files are records only, not the authoritative multi-device interface.
 
 ## When the human confirms a milestone
 

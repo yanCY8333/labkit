@@ -67,6 +67,10 @@
   .runcard .rline{font-size:12.5px;color:#444}
   .prog{background:#e8e8e8;border-radius:3px;height:10px;overflow:hidden;margin:4px 0}
   .prog>div{background:var(--ok);height:100%}
+  .tgl{flex:0 0 auto;width:20px;height:20px;line-height:1;padding:0 2px;margin:0;
+       font-size:10.5px;color:var(--dim);background:#fff;align-self:center}
+  .bcount{display:inline-block;padding:0 8px;border-radius:3px;font-size:11.5px;color:var(--dim);
+          border:1px solid var(--line);background:#f5f5f5;vertical-align:2px}
 </style>
 </head>
 <body>
@@ -96,9 +100,12 @@
      { title, source, type:"table",  columns:[...], rows:[[...],...] }   numbers copied verbatim from result files
      { title, source, type:"html",   html:"<svg .../> or <table ...>" }   inline SVG/table; no external libs, no fetch, no CDN
      { title,          type:"placeholder", hint:"what this spot is for" }   reserved empty spot, filled on human request
-   live is maintained by the watcher (see AGENTS.md "While a run is active"):
-     live: { updated:"...", runs:[ { name, dir, status(running|completed|failed), done, total,
-                                     failed, current, elapsed, eta, note } ] }
+   live is merged by agent_sync_logfull.py from independent per-run files (AGENTS.md "While a run is active"):
+      Status/live/<run_id>.json is each device's/run's only live record; multiple simultaneous runs are allowed.
+     live: { updated:"...", runs:[ { run_id, name, device:{id,label,host?,accelerator?}, dir,
+                                     status(running|completed|failed), done, total, failed, current,
+                                     elapsed, eta, note, updated } ] }
+     run_id is stable across resume; sync merges by run_id under a process lock and preserves legacy entries.
    Timestamps: real machine clock, seconds, explicit UTC offset (e.g. 2026-10-28 14:26:37 +08:00). No rounding, no fabrication.
    Log TYPE (six actions, nothing else): N new · R run · F fix (append correction, never overwrite) · M milestone (human confirmed + snapshot) · P promote (into HUMAN) · X fail.
    Every loggable operation writes start immediately and end immediately after checked completion; interruptions write X immediately; resumes are new R start/end operations.
@@ -126,6 +133,13 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s??"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const badge = st => `<span class="badge s-${esc(st||'planned')}">${esc(st||'?')}</span>`;
 const noteKey = k => `inter-note:${DATA.project.name}:${k}`;
+const foldKey = d => `inter-fold:${DATA.project.name}:${d}`;
+const dirOpen = d => localStorage.getItem(foldKey(d)) !== '1';
+const toggleDir = (e, d) => {
+  e.stopPropagation();
+  localStorage.setItem(foldKey(d), dirOpen(d) ? '1' : '0');
+  render();
+};
 const fieldRow = (l,v) => v ? `<b>${l}</b><span>${esc(v)}</span>` : '';
 
 // Experiment structure is numeric ascending; only time logs are newest-first.
@@ -171,6 +185,13 @@ function noteBox(key) {
     <textarea data-note data-k="${esc(key)}" oninput="saveNote(this)"></textarea>`;
 }
 
+function liveDevice(r) {
+  const d = r.device;
+  if (typeof d === 'string') return d || 'unspecified';
+  if (!d || typeof d !== 'object') return 'unspecified';
+  return [d.label || d.id, d.host, d.accelerator].filter(Boolean).join(' · ') || 'unspecified';
+}
+
 function liveHtml() {
   const L = DATA.live || {runs:[]};
   if (!L.runs.length) return '';
@@ -179,9 +200,11 @@ function liveHtml() {
     return `<div class="runcard">
       <span class="rname">${esc(r.name)}</span>
       <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
+      <div class="rline">${esc(r.run_id || '(legacy run)')} · device: ${esc(liveDevice(r))}</div>
       <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · running ${esc(r.current)}`:''}${r.elapsed?` · elapsed ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
       ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}
+      ${r.updated?`<div class="ps">updated: ${esc(r.updated)}</div>`:''}
       ${r.dir?`<div class="ps">${esc(r.dir)}</div>`:''}
     </div>`;
   }).join('');
@@ -196,13 +219,18 @@ function renderOverview() {
       .map(p=>{const[k,l]=p.split('|');return fieldRow(l,DATA.now[k])}).join('')}</div>`;
   h += `<hr class="rule"><div class="sect">Directions</div>`;
   for (const d of byExperimentId(DATA.directions)) {
+    const open = dirOpen(d.id);
+    const branches = byExperimentId(d.branches);
     h += `<div class="row" onclick="location.hash='${esc(d.id)}'">
+      <button class="tgl" title="${open?'Collapse':'Expand'} branches" onclick="toggleDir(event,'${esc(d.id)}')">${open?'▾':'▸'}</button>
       <span class="id">${esc(d.id)}</span><span class="name">${esc(d.name)}</span>${d.status==='active'?badge(d.status):''}
+      ${open?'':`<span class="bcount" title="${branches.length} branches (collapsed)">${branches.length} b</span>`}
       <span class="c">${esc(d.conclusion)}</span></div>`;
-    for (const b of byExperimentId(d.branches))
-      h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
-        <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
-        <span class="c">${esc(b.conclusion)}</span></div>`;
+    if (open)
+      for (const b of branches)
+        h += `<div class="row" style="padding-left:26px" onclick="location.hash='${esc(d.id+':'+b.id)}'">
+          <span class="id">${esc(b.id)}</span><span class="name">${esc(b.name)}</span>${b.status==='active'?badge(b.status):''}
+          <span class="c">${esc(b.conclusion)}</span></div>`;
   }
   if (!DATA.directions.length) h += `<p class="empty">No directions yet.</p>`;
   h += `<hr class="rule"><div class="sect">Recent log</div><div class="log">${esc((DATA.log||[]).slice(-10).reverse().join('\n')||'(no log entries)')}</div>`;
