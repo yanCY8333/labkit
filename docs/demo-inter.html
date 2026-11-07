@@ -519,6 +519,13 @@ function noteBox(key) {
     <textarea data-note data-k="${esc(key)}" oninput="saveNote(this)"></textarea>`;
 }
 
+function liveDevice(r) {
+  const d = r.device;
+  if (typeof d === 'string') return d || 'unspecified';
+  if (!d || typeof d !== 'object') return 'unspecified';
+  return [d.label || d.id, d.host, d.accelerator].filter(Boolean).join(' · ') || 'unspecified';
+}
+
 function liveHtml() {
   const L = DATA.live || {runs:[]};
   if (!L.runs.length) return '';
@@ -527,9 +534,11 @@ function liveHtml() {
     return `<div class="runcard">
       <span class="rname">${esc(r.name)}</span>
       <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
+      <div class="rline">${esc(r.run_id || '(legacy run)')} · device: ${esc(liveDevice(r))}</div>
       <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · running ${esc(r.current)}`:''}${r.elapsed?` · elapsed ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
       ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}
+      ${r.updated?`<div class="ps">updated: ${esc(r.updated)}</div>`:''}
       ${r.dir?`<div class="ps">${esc(r.dir)}</div>`:''}
     </div>`;
   }).join('');
