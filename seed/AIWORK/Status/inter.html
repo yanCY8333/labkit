@@ -102,10 +102,11 @@
      { title,          type:"placeholder", hint:"what this spot is for" }   reserved empty spot, filled on human request
    live is merged by agent_sync_logfull.py from independent per-run files (AGENTS.md "While a run is active"):
       Status/live/<run_id>.json is each device's/run's only live record; multiple simultaneous runs are allowed.
-     live: { updated:"...", runs:[ { run_id, name, device:{id,label,host?,accelerator?}, dir,
+     live: { updated:"...", runs:[ { run_id, name, device:{id,label,host?,accelerator?}, alloc, dir,
                                      status(running|completed|failed), done, total, failed, current,
                                      elapsed, eta, note, updated } ] }
-     run_id is stable across resume; sync merges by run_id under a process lock and preserves legacy entries.
+     run_id is a global monotonic counter (r0001, r0002, …) minted as max+1 of existing live/r*.json and log references;
+     stable across resume; sync merges by run_id under a process lock and preserves legacy entries.
    Timestamps: real machine clock, seconds, explicit UTC offset (e.g. 2026-10-28 14:26:37 +08:00). No rounding, no fabrication.
    Log TYPE (six actions, nothing else): N new · R run · F fix (append correction, never overwrite) · M milestone (human confirmed + snapshot) · P promote (into HUMAN) · X fail.
    Every loggable operation writes start immediately and end immediately after checked completion; interruptions write X immediately; resumes are new R start/end operations.
@@ -119,13 +120,15 @@ const DATA = {
   updated: "{{DATETIME}}",
   project: { name: "{{NAME}}", goal: "{{GOAL}}" },
   now: { goal: "{{GOAL}}", doing: "", next: "", blocked: "" },
-  live: { updated: "", runs: [] },  directions: [
+  live: { updated: "", runs: [] },
+  directions: [
     /* { id:"e001", name:"...", status:"closed", goal:"...", conclusion:"...", evidence:"...",
          panels:[ {title:"...", type:"placeholder", hint:"..."} ],
          branches:[ { id:"b01", name:"...", status:"closed", goal:"...", conclusion:"...", evidence:"...",
                       panels:[ {title:"...", source:"...", type:"table", columns:["..."], rows:[["..."]]} ] } ] } */
   ],
-  log: []
+  log: [],
+  logFull: []
 };
 /* ===================== code below: do not touch ===================== */
 
@@ -200,7 +203,7 @@ function liveHtml() {
     return `<div class="runcard">
       <span class="rname">${esc(r.name)}</span>
       <span class="badge s-${r.status==='running'?'active':'planned'}">${esc(r.status)}</span>
-      <div class="rline">${esc(r.run_id || '(legacy run)')} · device: ${esc(liveDevice(r))}</div>
+      <div class="rline">${esc(r.run_id || '(legacy run)')} · device: ${esc(liveDevice(r))}${r.alloc?` · alloc: ${esc(r.alloc)}`:''}</div>
       <div class="rline">${r.done}/${r.total}${r.failed?` · failed ${r.failed}`:''}${r.current?` · running ${esc(r.current)}`:''}${r.elapsed?` · elapsed ${esc(r.elapsed)}`:''}${r.eta?` · ETA ${esc(r.eta)}`:''}</div>
       <div class="prog"><div style="width:${pct}%"></div></div>
       ${r.note?`<div class="rline">${esc(r.note)}</div>`:''}

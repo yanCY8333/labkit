@@ -16,7 +16,8 @@ Ask the human once at the first work session, then record here.
 
 <!-- Optional: repeat this subsection for each independent device/run; completed subsections are removed individually at close.
 ### Running — <run_id>
-- device: <host / accelerator>
+- device: <host — always one machine, never a card/queue/node>
+- alloc: <what this run occupies — gpu:N / nodes:N / gpu:0..3>
 - status: running
 - run: <direction/branch/queue>
 - doing: <current item>

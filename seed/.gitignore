@@ -6,6 +6,18 @@
 __pycache__/
 .ipynb_checkpoints/
 
-# The shared pools stay on disk only; integrity is tracked by path+hash references.
+# venv is uv's default at repo root; disposable, never tracked (self-ignores too).
+.venv/
+
+# The data pool stays on disk only; integrity is tracked by path+hash references.
 AIWORK/Experiment/data/*
 !AIWORK/Experiment/data/.gitkeep
+
+# Per-run live state is transient — watchers write it and the syncer merges it; nothing
+# here is durable. Keep only the placeholder so the directory exists in git.
+AIWORK/Status/live/*
+!AIWORK/Status/live/.gitkeep
+
+# Transient sync artifacts.
+AIWORK/Status/agent_sync_logfull.lock
+AIWORK/Status/inter.html.tmp

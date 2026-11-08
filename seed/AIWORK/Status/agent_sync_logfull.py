@@ -92,6 +92,7 @@ def normalize_live_entry(payload):
         'run_id': run_id,
         'name': name,
         'device': device,
+        'alloc': payload.get('alloc') or '',
         'dir': payload.get('dir') or payload.get('queue') or '',
         'status': status,
         'done': int(payload.get('done', 0)),
@@ -179,6 +180,7 @@ def legacy_watch_entry():
     return {
         'name': name,
         'device': {'id': 'unspecified', 'label': 'unspecified'},
+        'alloc': payload.get('alloc') or '',
         'dir': payload.get('dir') or payload.get('queue') or '',
         'status': payload.get('status', 'running'),
         'done': payload.get('done', 0),
@@ -260,8 +262,11 @@ def main():
         data_end = text.index('/* ===================== code below', data_start)
         block = text[data_start:data_end]
         live = merged_live(block)
+        # Match only a whole-line `live: {...},` object literal. If an agent ever
+        # merges another field onto the same line (e.g. `live: {...}, directions: [`),
+        # this no longer matches and raises instead of silently eating that field.
         block, count = re.subn(
-            r'(?m)^  live:.*$',
+            r'(?m)^  live: \{.*\},\s*$',
             lambda _: '  live: ' + json.dumps(live, ensure_ascii=False, separators=(',', ':')) + ',',
             block,
             count=1,
