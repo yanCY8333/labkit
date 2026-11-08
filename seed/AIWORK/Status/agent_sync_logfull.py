@@ -215,8 +215,10 @@ def merged_live(block):
     live, legacy = read_live_runs(block)
     files = sorted(LIVE.glob('*.json')) if LIVE.exists() else []
     if not files:
-        # A legacy watcher may still be active; never clear it during migration.
-        return live
+        # Only genuine pre-run_id records survive after every per-run file is
+        # retired. Migrated cards must disappear with their file.
+        timestamps = [str(run.get('updated') or run.get('timestamp') or '') for run in legacy]
+        return {'updated': max(timestamps, default=''), 'runs': legacy}
     runs = list(legacy)
     for path in files:
         runs.append(normalize_live_entry(json.loads(path.read_text(encoding='utf-8'))))
